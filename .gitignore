@@ -30,3 +30,12 @@
 *.exe
 *.out
 *.app
+
+*.aps
+*.vspscc
+*.user
+
+
+.vs/*
+bin/*
+.cmake/**

@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source">
+      <UniqueIdentifier>{6eac9eed-4be6-42e3-acb0-cb912d0d3373}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include">
+      <UniqueIdentifier>{92eec5d2-e4cf-4581-ba02-e7b0fc1b80d1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Data">
+      <UniqueIdentifier>{f3c0d0e9-5509-4544-b9f1-04c6d4ee9106}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Source\Main.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Trainer.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Tester.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MNISTDataSet.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Visualizer.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\QuantizedImage.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="Data\train-images.idx3-ubyte">
+      <Filter>Data</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Data\train-labels.idx1-ubyte">
+      <Filter>Data</Filter>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Include\Trainer.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Tester.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\MNISTDataSet.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Visualizer.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\QuantizedImage.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Params.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Data\t10k-images.idx3-ubyte">
+      <Filter>Data</Filter>
+    </None>
+    <None Include="Data\t10k-labels.idx1-ubyte">
+      <Filter>Data</Filter>
+    </None>
+  </ItemGroup>
+</Project>
