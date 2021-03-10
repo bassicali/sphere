@@ -8,12 +8,29 @@
 
 namespace sphere
 {
+	struct RecallScore
+	{
+		int Success;
+		int Inconclusive;
+		int Total;
+		RecallScore();
+	};
+
+	struct RecallStats
+	{
+		RecallScore Scores[10];
+		RecallScore Overall;
+		void Print();
+	};
+
 	class Tester
 	{
 	public:
-		Tester(const std::string& ImagesFile, const std::string& LabelsFile, const std::string& MemoryFile);
+		Tester(const std::string& ImagesFile, const std::string& LabelsFile);
 
-		void TestImages(int num_images);
+		RecallStats TestImages(sphere::Memory& sdm, int num_images);
+
+		static uint8_t CueMemory(QuantizedImage& image, Memory& memory);
 
 	private:
 		MNISTDataSet data;

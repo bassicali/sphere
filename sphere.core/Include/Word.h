@@ -11,10 +11,18 @@
 
 typedef uint32_t SUBWORD;
 #define SUBWORD_NUM_DIMENSIONS (8*sizeof(SUBWORD))
+#define DECREMENT_UNMATCHED 0
+#define MANHATTAN_DISTANCE 0
 
-typedef uint8_t COUNTER;
+#if DECREMENT_UNMATCHED
+typedef int8_t COUNTER;
 #define COUNTER_MIN INT8_MIN
 #define COUNTER_MAX INT8_MAX
+#else
+typedef uint16_t COUNTER;
+#define COUNTER_MIN 0
+#define COUNTER_MAX UINT16_MAX
+#endif
 
 namespace sphere
 {
@@ -30,7 +38,7 @@ namespace sphere
 
 		Word(std::istream& stream);
 
-		static Word FromCounters(const std::vector<COUNTER>& counters, int RangeLen);
+		static Word FromCounters(const std::vector<COUNTER>& counters, int RangeLen, bool& Conclusive);
 
 		const float DistanceTo(const Word& Other) const;
 

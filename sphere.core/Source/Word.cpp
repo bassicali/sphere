@@ -10,6 +10,11 @@ using namespace std;
 using namespace sphere;
 
 Word::Word()
+	: wordLen(0)
+	, rangeBitLen(0)
+	, rangeSize(0)
+	, numSubWords(0)
+	, lastSubwordLen(0)
 {
 }
 
@@ -92,7 +97,8 @@ Word::Word(int N, int RangeBits, uint8_t* Ptr, int Len)
  Construct from an string
 */
 Word::Word(int N, int RangeBits, string StringData)
-	: wordLen(N), rangeBitLen(RangeBits)
+	: wordLen(N)
+	, rangeBitLen(RangeBits)
 {
 	rangeSize = uint8_t(1 << rangeBitLen);
 	numSubWords = wordLen / SUBWORD_NUM_DIMENSIONS;
@@ -138,7 +144,8 @@ Word::Word(int N, int RangeBits, string StringData)
  Private constructor for supplying the subwords array
 */
 Word::Word(int N, int RangeBits, vector<SUBWORD>& SubWords)
-	: wordLen(N), rangeBitLen(RangeBits)
+	: wordLen(N)
+	, rangeBitLen(RangeBits)
 {
 	int total_len = N * RangeBits;
 
@@ -202,28 +209,43 @@ const float Word::DistanceTo(const Word& Other) const
 
 				if (dist_1 <= dist_2)
 				{
+#if MANHATTAN_DISTANCE
+					running_sum += dist_1;
+#else
 					running_sum += (dist_1 * dist_1);
+#endif
 				}
 				else
 				{
+#if MANHATTAN_DISTANCE
+					running_sum += dist_2;
+#else
 					running_sum += (dist_2 * dist_2);
+
+#endif
 				}
 			}
 		}
 
+#if MANHATTAN_DISTANCE
+		dist = running_sum;
+#else
 		dist = sqrtf(running_sum);
+#endif
 	}
 
 	return dist;
 }
 
 /*static*/
-Word Word::FromCounters(const vector<COUNTER>& counters, int RangeLen)
+Word Word::FromCounters(const vector<COUNTER>& counters, int RangeLen, bool& Conclusive)
 {
+	Conclusive = false;
 	int word_len = counters.size() / (1 << RangeLen);
 
 	if (RangeLen == 1)
 	{
+		Conclusive = true;
 		vector<SUBWORD> subwords;
 		int bit_index = 0;
 		SUBWORD w = 0;
@@ -262,21 +284,27 @@ Word Word::FromCounters(const vector<COUNTER>& counters, int RangeLen)
 		vector<uint8_t> values;
 		int range_size = 1 << RangeLen;
 
-		for (int ctr_index = 0; ctr_index < counters.size();)
+		for (int ctr_idx = 0; ctr_idx < counters.size();)
 		{
 			int max = 0;
 			uint8_t value_at_max = 0;
-
-			for (uint8_t val = 0; val < range_size; val++, ctr_index++)
+			
+			for (uint8_t val = 0; val < range_size; val++, ctr_idx++)
 			{
-				if (counters[ctr_index] > max)
+				if (counters[ctr_idx] > max)
 				{
-					max = counters[ctr_index];
+					max = counters[ctr_idx];
 					value_at_max = val;
+					Conclusive = true;
 				}
 			}
 
 			values.push_back(value_at_max);
+		}
+
+		if (!Conclusive)
+		{
+			return Word();
 		}
 
 		assert(values.size() == word_len);

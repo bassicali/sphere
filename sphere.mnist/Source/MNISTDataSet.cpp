@@ -5,7 +5,7 @@
 
 #include "Word.h"
 #include "MNISTDataSet.h"
-#include "Params.h"
+#include "Constants.h"
 #include "Visualizer.h"
 
 using namespace std;
@@ -133,26 +133,90 @@ void MNISTDataSet::Load()
 #undef LOAD_INT
 }
 
-Word MNISTDataSet::CreateAverageImage()
+Word MNISTDataSet::CreateAverageImage(int8_t label)
 {
 	int* average = new int[WORD_NUM_DIMENSIONS];
 	memset(average, 0, WORD_NUM_DIMENSIONS * sizeof(int));
 
 	uint8_t* buff = new uint8_t[WORD_NUM_DIMENSIONS];
+	int count = 0;
 	for (QuantizedImage& image : Images)
 	{
+		if (image.Label != label)
+			continue;
+
 		image.Unpack(buff, WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, 1);
 
 		for (int i = 0; i < WORD_NUM_DIMENSIONS; i++)
 			average[i] += buff[i];
+
+		count++;
 	}
 
 	memset(buff, 0, WORD_NUM_DIMENSIONS * sizeof(uint8_t));
 	for (int i = 0; i < WORD_NUM_DIMENSIONS; i++)
 	{
-		average[i] /= Images.size();
+		average[i] /= count;
 		buff[i] = (uint8_t)average[i] * 17;
 	}
+
+	QuantizedImage image(buff, WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, false);
+	return Word(WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, image.Data, image.Length);
+}
+
+Word MNISTDataSet::CreateWeightedAverageImage(int8_t target_label, float* WeightAdjustments)
+{
+	int counts[10];
+	memset(counts, 0, sizeof(int) * 10);
+
+	int* sums[10];
+	for (int label = 0; label < 10; label++)
+	{
+		sums[label] = new int[WORD_NUM_DIMENSIONS];
+		memset(sums[label], 0, sizeof(int) * WORD_NUM_DIMENSIONS);
+	}
+
+	uint8_t* buff = new uint8_t[WORD_NUM_DIMENSIONS];
+	for (QuantizedImage& image : Images)
+	{
+		if (target_label != -1 && image.Label != target_label)
+			continue;
+
+		image.Unpack(buff, WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, 17);
+
+		assert(image.Label < 10);
+		counts[image.Label]++;
+
+		for (int px = 0; px < WORD_NUM_DIMENSIONS; px++)
+			sums[image.Label][px] += buff[px];
+	}
+
+	float* fbuff = new float[WORD_NUM_DIMENSIONS];
+	memset(fbuff, 0, sizeof(float) * WORD_NUM_DIMENSIONS);
+
+	for (int label = 0; label < 10; label++)
+	{
+		if (target_label != -1 && label != target_label)
+			continue;
+
+		float weight = WeightAdjustments ? WeightAdjustments[label] : 1.0f;
+
+		for (int px = 0; px < WORD_NUM_DIMENSIONS; px++)
+		{
+			float average = weight * float(sums[label][px]) / counts[label];
+			fbuff[px] += average;
+		}
+	}
+
+	memset(buff, 0, sizeof(uint8_t) * WORD_NUM_DIMENSIONS);
+	int divisor = WeightAdjustments || target_label != -1 ? 1 : 10;
+	for (int px = 0; px < WORD_NUM_DIMENSIONS; px++)
+	{
+		buff[px] = (uint8_t)(fbuff[px] / divisor);
+	}
+
+	for (int i = 0; i < 10; i++)
+		delete[] sums[i];
 
 	QuantizedImage image(buff, WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, false);
 	return Word(WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, image.Data, image.Length);

@@ -1,7 +1,7 @@
 
 #include <iostream>
 
-#include "Params.h"
+#include "Constants.h"
 #include "Common.h"
 #include "Word.h"
 #include "Tester.h"
@@ -10,35 +10,62 @@
 using namespace std;
 using namespace sphere;
 
-Tester::Tester(const std::string& ImagesFile, const std::string& LabelsFile, const std::string& MemoryFile)
+Tester::Tester(const std::string& ImagesFile, const std::string& LabelsFile)
 	: data(ImagesFile.c_str(), LabelsFile.c_str())
 {
-	sdm = Memory::LoadFromFile(MemoryFile);
 }
 
-void Tester::TestImages(int num_images)
+RecallStats Tester::TestImages(sphere::Memory& sdm, int limit)
 {
+	RecallStats stats;
 	int freq_counter[10];
-	memset(freq_counter, 0, sizeof(int) * 10);
 
-	int success = 0;
-	int total = 0;
+	limit = limit > 0 && limit <= data.Images.size() ? limit : data.Images.size();
+	LOG_INFO("Recalling %d images", limit);
 
-	for (int i = 0; i < data.Images.size(); i++)
+	for (int img_idx = 0; img_idx < limit; img_idx++)
 	{
-		QuantizedImage& image = data.Images[i];
-		Word address(image.NumPixels, sdm.RangeBitLength(), image.Data, image.Length);
-		
-		LOG_INFO("Cuing memory for image with label '%d'", image.Label);
-		Word data = sdm.Read(address);
+		QuantizedImage& image = data.Images[img_idx];
 
-		char filename[100];
-		if (i < 10)
+		uint8_t recall = CueMemory(image, sdm);
+
+		if (recall != 0xFF)
 		{
-			sprintf_s(filename, "visual\\Test-Image-%d.bmp", image.Label);
-			CreateBitmap(image, filename, 28, 28, 10);
+			bool is_match = recall == image.Label;
+			LOG_INFO("(%d of %d) Result of '%d': '%d' -> %s", img_idx, limit, image.Label, recall, is_match ? "Success" : "Fail");
+
+			if (is_match)
+			{
+				stats.Overall.Success++;
+				stats.Scores[image.Label].Success++;
+			}
+		}
+		else
+		{
+			LOG_INFO("(%d of %d) Result of '%d': ??? -> Inconclusive", img_idx, limit, image.Label);
+			stats.Overall.Inconclusive++;
+			stats.Scores[image.Label].Inconclusive++;
 		}
 
+		stats.Overall.Total++;
+		stats.Scores[image.Label].Total++;
+	}
+
+	return stats;
+}
+
+uint8_t Tester::CueMemory(QuantizedImage& image, Memory& memory)
+{
+	static int freq_counter[10];
+
+	Word address(image.NumPixels, memory.RangeBitLength(), image.Data, image.Length);
+
+	bool found = false;
+	Word data = memory.Read(address, found);
+
+	if (found)
+	{
+		memset(freq_counter, 0, sizeof(int) * 10);
 		data.EnumerateInts([&](int index, uint8_t integer) -> void
 		{
 			if (integer > 9)
@@ -61,14 +88,39 @@ void Tester::TestImages(int num_images)
 			}
 		}
 
-		bool is_match = value_at_max == image.Label;
-		LOG_INFO("Result: '%d' -> %s", value_at_max, is_match ? "Success" : "Fail");
-
-		if (is_match)
-			success++;
-
-		total++;
+		return value_at_max;
 	}
 
-	LOG_INFO("Test result: %d/%d (%.2f%)", success, total, float(success) / total);
+	return 0xFF;
 }
+
+RecallScore::RecallScore() 
+	: Success(0)
+	, Inconclusive(0)
+	, Total(0)
+{
+}
+
+void RecallStats::Print()
+{
+	LOG_INFO("RECALL SCORE: %d of %d (%.2f) - Inconclusive: %d of %d (%.2f)", 
+		Overall.Success, 
+		Overall.Total, 
+		float(Overall.Success) / Overall.Total,
+		Overall.Inconclusive,
+		Overall.Total,
+		float(Overall.Inconclusive) / Overall.Total);
+
+	for (int label = 0; label < 10; label++)
+	{
+		LOG_INFO("\tLabel '%d': %d of %d (%.2f) - Inconclusive: %d of %d (%.2f)", 
+			label, 
+			Scores[label].Success, 
+			Scores[label].Total, 
+			float(Scores[label].Success) / Scores[label].Total,
+			Scores[label].Inconclusive,
+			Scores[label].Total, 
+			float(Scores[label].Inconclusive) / Scores[label].Total);
+	}
+}
+

@@ -1,6 +1,8 @@
 
 #include "Common.h"
 
+#include <string>
+#include <filesystem>
 #include <cstdarg>
 #include <cstdio>
 #include <windows.h>
@@ -34,15 +36,7 @@ void sphere::EchoLogMessage(const char* fmt...)
 	va_end(args);
 }
 
-bool sphere::CreateLogFile(const char* filename)
+void sphere::SetLogFile(void* handle)
 {
-	log_file = CreateFile(filename, GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-
-	if (log_file == INVALID_HANDLE_VALUE)
-	{
-		log_file = nullptr;
-		return false;
-	}
-
-	return true;
+	log_file = handle;
 }

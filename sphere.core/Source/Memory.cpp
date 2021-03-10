@@ -91,37 +91,51 @@ bool Memory::Write(const Word& Addr, const Word& Data)
 			min = dist;
 	}
 
-	LOG_INFO("[WRITE STATS] Activated: %d (%.2f) \t| D_avg: %.2f \t| D_min: %.2f", activated, float(activated) / storage.size(), sum / len, min);
+	LastOPStats.Activations = activated;
+	LastOPStats.AverageDistance = sum / len;
+	LastOPStats.MinimumDistance = min;
 	
 	// TODO: return false when at capacity
 	writeCount++;
 	return true;
 }
 
-Word Memory::Read(const Word& Addr)
+Word Memory::Read(const Word& Addr, bool& Conclusive)
 {
 	if (!initialized) 
 		throw exception("Memory has not been initialized");
 
 	int len = storage.size();
+	float sum = 0.0f;
+	float min = FLT_MAX;
+	int activated = 0;
 
 	// TODO: impl iterative reading based on the SD of activated locations
 
 	vector<COUNTER> counters(Addr.Length() * Addr.RangeSize(), 0);
 
 	// Find each HL that's within the activation radius and accumulate its values to the counters array
-
 	for (int i = 0; i < len; i++)
 	{
-		int d = Addr.DistanceTo(storage[i].Address());
+		float dist = Addr.DistanceTo(storage[i].Address());
 		
-		if (d <= radius)
+		if (dist <= radius)
 		{
 			storage[i].Read(counters);
+			activated++;
 		}
+
+		sum += dist;
+
+		if (dist < min)
+			min = dist;
 	}
 
-	return Word::FromCounters(counters, rangeLen);
+	LastOPStats.Activations = activated;
+	LastOPStats.AverageDistance = sum / len;
+	LastOPStats.MinimumDistance = min;
+
+	return Word::FromCounters(counters, rangeLen, Conclusive);
 }
 
 void Memory::SaveToFile(const string& FilePath)
@@ -207,6 +221,8 @@ Memory::Memory(istream& stream)
 			LOG_INFO("Load progress: %.0f%%", progress);
 		}
 	}
+
+	LOG_INFO("Load completed. Memory has %d total writes", writeCount);
 
 	initialized = true;
 }

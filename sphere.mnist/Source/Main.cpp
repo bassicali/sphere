@@ -2,40 +2,81 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 
 #include <string>
 #include <iostream>
+#include <filesystem>
 #include <vector>
 
 #include <windows.h>
 
 #include "Trainer.h"
 #include "Tester.h"
-#include "Params.h"
+#include "Constants.h"
 #include "Visualizer.h"
 
 using namespace std;
 using namespace sphere;
 
-int mode = -1;
-int num_hard_locations = NUM_HARD_LOC;
-int training_count = TRAINING_SET_LIMIT;
-int log_distances = 0;
-int save_visuals = 0;
-string output_filename("mnist.sph");
-
-Trainer* trainer;
-
-enum class SubRoutine : int
+struct ProgramParams
 {
-	Recall,
-	Train,
-	TestSerialization
+	int NumHardLocations = NUM_HARD_LOC;
+	int TrainingCount = TRAINING_SET_LIMIT;
+	int RecallCount = 100;
+	int StartFrom = 0;
+	int LogDistances = 0;
+	int SaveVisuals = 0;
+	int AdjustWeights = 1;
+	int SegmentImprints = 1;
+
+#if MANHATTAN_DISTANCE
+	float ImprintWeight = 0.70f;
+#else
+	float ImprintWeight = 0.28f;
+#endif
+	string InputImages1 = string("train-images.idx3-ubyte");
+	string InputLabels1 = string("train-labels.idx1-ubyte");
+
+	string InputImages2 = string("t10k-images.idx3-ubyte");
+	string InputLabels2 = string("t10k-labels.idx1-ubyte");
+
+	string MemFile = string("mnist.sph");
+} params;
+
+Trainer* trainer = nullptr;
+
+float weights[10] =
+{
+	1.0f, // 0
+	2.5f, // 1
+	1.0f, // 2
+	0.8f, // 3
+	1.0f, // 4
+	1.0f, // 5
+	1.0f, // 6
+	1.5f, // 7
+	0.7f, // 8
+	0.9f  // 9
 };
+
+typedef void (*Subroutine_Func)(void);
+struct Subroutine
+{
+	string Name;
+	Subroutine_Func Func;
+
+	Subroutine(string name, Subroutine_Func func)
+	{
+		Name = name;
+		Func = func;
+	}
+};
+
 
 BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
 {
-	if (fdwCtrlType == CTRL_C_EVENT && mode == (int)SubRoutine::Train && trainer)
+	if (fdwCtrlType == CTRL_C_EVENT && trainer)
 	{
 		LOG_INFO("** Ctrl-C **");
 
@@ -49,35 +90,68 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
 				Sleep(1000);
 			}
 		}
-
-		return TRUE;
 	}
 
 	return FALSE;
 }
 
-void TrainingSubRoutine()
+void TrainAndRecall()
 {
 	LOG_INFO("Training with MNIST data");
 
-	trainer = new Trainer("train-images.idx3-ubyte", "train-labels.idx1-ubyte", num_hard_locations);
-	trainer->TrainMemory(output_filename.c_str(), training_count, log_distances, save_visuals);
+	trainer = new Trainer(params.InputImages1, params.InputLabels1, params.NumHardLocations);
+
+	float* in_weights = params.AdjustWeights ? weights : nullptr;
+	trainer->InitializeHardLocationsAddrs(params.ImprintWeight, in_weights, params.SegmentImprints);
+
+	trainer->TrainMemory(nullptr, 0, params.TrainingCount, params.LogDistances, params.SaveVisuals);
+
+	LOG_INFO("Recalling with learned data");
+	Tester tester1(params.InputImages1, params.InputLabels1);
+	auto results1 = tester1.TestImages(trainer->Memory(), params.RecallCount);
+	results1.Print();
+
+	LOG_INFO("Recalling with unlearned data");
+	Tester tester2(params.InputImages2, params.InputLabels2);
+	auto results2 = tester2.TestImages(trainer->Memory(), params.RecallCount);
+
+	results2.Print();
+
+	if (!params.MemFile.empty())
+	{
+		trainer->Memory().SaveToFile(params.MemFile);
+	}
 }
 
-void RecallSubRoutine()
+void TrainMemory()
+{
+	trainer = new Trainer(params.InputImages1, params.InputLabels1, params.NumHardLocations);
+
+	float* in_weights = params.AdjustWeights ? weights : nullptr;
+	trainer->InitializeHardLocationsAddrs(params.ImprintWeight, in_weights, false);
+
+	LOG_INFO("Training with MNIST data");
+	trainer->TrainMemory(params.MemFile.c_str(), 0, params.TrainingCount, params.LogDistances, params.SaveVisuals);
+}
+
+void Recall()
 {
 	LOG_INFO("Testing trained memory");
 
-	Tester tester("t10k-images.idx3-ubyte", "t10k-labels.idx1-ubyte", output_filename);
-	tester.TestImages(100);
+	LOG_INFO("Loading memory: %s", params.MemFile.c_str());
+	auto sdm = Memory::LoadFromFile(params.MemFile);
+
+	Tester tester(params.InputImages1, params.InputLabels1);
+	auto results = tester.TestImages(sdm, params.TrainingCount);
+	results.Print();
 }
 
 void TestSerialization()
 {
-	TrainingSubRoutine();
+	TrainMemory();
 
-	LOG_INFO("Loading memory from file: %s", output_filename.c_str());
-	Memory mem = Memory::LoadFromFile(output_filename);
+	LOG_INFO("Loading memory from file: %s", params.MemFile.c_str());
+	Memory mem = Memory::LoadFromFile(params.MemFile);
 
 	LOG_INFO("Saving memory back to file: mnist2.sph");
 	mem.SaveToFile("mnist2.sph");
@@ -85,23 +159,36 @@ void TestSerialization()
 	// Compare the hash of the two files
 }
 
+
 int main(int argc, char** argv)
 {
-#define PARSE_INT_ARG(str,prefix,output) if (str.rfind(prefix,0) == 0) { string num = str.substr(prefix.length()); output = atoi(num.c_str()); }
-#define PARSE_STR_ARG(str,prefix,output) if (str.rfind(prefix,0) == 0) { output = str.substr(prefix.length()); }
+	namespace fs = std::filesystem;
+
+#define PARSE_INT_ARG(str,prefix,output) if (str.rfind(prefix,0) == 0) { string num = str.substr(prefix.length()); params.output = atoi(num.c_str()); }
+#define PARSE_FLT_ARG(str,prefix,output) if (str.rfind(prefix,0) == 0) { string num = str.substr(prefix.length()); params.output = atof(num.c_str()); }
+#define PARSE_STR_ARG(str,prefix,output) if (str.rfind(prefix,0) == 0) { params.output = str.substr(prefix.length()); }
+
+	vector<Subroutine> routines;
+	routines.push_back(Subroutine("train", &TrainMemory));
+	routines.push_back(Subroutine("recall", &Recall));
+	routines.push_back(Subroutine("train_recall", &TrainAndRecall));
+	routines.push_back(Subroutine("serialization-test", &TestSerialization));
 
 	vector<string> args;
 	for (int i = 0; i < argc; i++)
 		args.push_back(string(argv[i]));
 
-	if (args[1].compare("train") == 0)
-		mode = (int)SubRoutine::Train;
-	else if (args[1].compare("recall") == 0)
-		mode = (int)SubRoutine::Recall;
-	else if (args[1].compare("serialization-test") == 0)
-		mode = (int)SubRoutine::TestSerialization;
+	Subroutine_Func routine = nullptr;
+	for (auto& r : routines)
+	{
+		if (args[1].compare(r.Name) == 0)
+		{
+			routine = r.Func;
+			break;
+		}
+	}
 
-	if (mode == -1)
+	if (!routine)
 	{
 		cout << "Invalid arguments." << endl;
 		return 1;
@@ -109,11 +196,18 @@ int main(int argc, char** argv)
 
 	for (int i = 2; i < args.size(); i++)
 	{
-		PARSE_INT_ARG(args[i], string("--count="), training_count);
-		PARSE_INT_ARG(args[i], string("--hl="), num_hard_locations);
-		PARSE_INT_ARG(args[i], string("--log-distances="), log_distances);
-		PARSE_INT_ARG(args[i], string("--save-visuals="), save_visuals);
-		PARSE_STR_ARG(args[i], string("--output="), output_filename);
+		PARSE_INT_ARG(args[i], string("--count="), TrainingCount);
+		PARSE_INT_ARG(args[i], string("--rcount="), RecallCount);
+		PARSE_INT_ARG(args[i], string("--start="), StartFrom);
+		PARSE_INT_ARG(args[i], string("--hl="), NumHardLocations);
+		PARSE_FLT_ARG(args[i], string("--imprint="), ImprintWeight);
+		PARSE_FLT_ARG(args[i], string("--segment-imprints="), SegmentImprints);
+		PARSE_FLT_ARG(args[i], string("--adjust-weights="), AdjustWeights);
+		PARSE_INT_ARG(args[i], string("--log-distances="), LogDistances);
+		PARSE_INT_ARG(args[i], string("--save-visuals="), SaveVisuals);
+		PARSE_STR_ARG(args[i], string("--images="), InputImages1);
+		PARSE_STR_ARG(args[i], string("--labels="), InputLabels1);
+		PARSE_STR_ARG(args[i], string("--file="), MemFile);
 	}
 
 	if (SetConsoleCtrlHandler(CtrlHandler, TRUE) == 0)
@@ -122,32 +216,54 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	CreateLogFile("sphere-log.txt");
+	string filename("sphere-log.txt");
 
-	LOG_INFO("Num hard locations: %d", num_hard_locations);
-	LOG_INFO("Training count: %d", training_count);
-	LOG_INFO("Output file: %s", output_filename.c_str());
-	LOG_INFO("Num image distances to log: %d", log_distances);
-	LOG_INFO("Num visual bitmaps to save: %d", save_visuals);
+	if (fs::exists(filename))
+	{
+		time_t result = time(nullptr);
+		char filename_buff[128];
+		sprintf_s(filename_buff, "sphere-log-%d.txt", result);
+		fs::rename(filename, filename_buff);
+	}
+
+	HANDLE log_file = CreateFile(filename.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (log_file != INVALID_HANDLE_VALUE)
+	{
+		SetLogFile(log_file);
+	}
+	else
+	{
+		LOG_ERROR("Could not create log file");
+	}
+
+	LOG_INFO("Parameters:");
+	LOG_INFO("\tMode: %s", args[1].c_str());
+	LOG_INFO("\tData set 1: %s + %s", params.InputImages1.c_str(), params.InputLabels1.c_str());
+	LOG_INFO("\tData set 2: %s + %s", params.InputImages2.c_str(), params.InputLabels2.c_str());
+	LOG_INFO("\tFile: %s", params.MemFile.c_str());
+	LOG_INFO("\tAccess Sphere Radius: %d", RADIUS);
+	LOG_INFO("\tHard locations: %d", params.NumHardLocations);
+	LOG_INFO("\tImprint weight: %.3f", params.ImprintWeight);
+	LOG_INFO("\tSegment imprints: %d", params.SegmentImprints);
+	LOG_INFO("\tUse weight adjustments: %d", params.AdjustWeights);
+	LOG_INFO("\tTraining count: %d", params.TrainingCount);
+	LOG_INFO("\tRecall count: %d", params.RecallCount);
+	LOG_INFO("\tStart from: %d", params.StartFrom);
+	LOG_INFO("\tImage distances to log: %d", params.LogDistances);
+	LOG_INFO("\tVisual bitmaps to save: %d", params.SaveVisuals);
 
 	try
 	{
-		switch (SubRoutine(mode))
-		{
-			case SubRoutine::Train:
-				TrainingSubRoutine();
-				break;
-			case SubRoutine::Recall:
-				RecallSubRoutine();
-				break;
-			case SubRoutine::TestSerialization:
-				TestSerialization();
-				break;
-		}
+		routine();
 	}
 	catch (exception& ex)
 	{
 		cout << "Unhandled error: " << ex.what() << endl;
+		return 1;
+	}
+	catch (...)
+	{
+		cout << "Unhandled error" << endl;
 		return 1;
 	}
 

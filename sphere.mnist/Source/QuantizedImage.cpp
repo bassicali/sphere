@@ -1,6 +1,6 @@
 
 #include "QuantizedImage.h"
-#include "Params.h"
+#include "Constants.h"
 #include "Word.h"
 
 #include <cassert>

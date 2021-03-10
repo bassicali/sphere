@@ -36,10 +36,16 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="Data\train-images.idx3-ubyte">
+    <CopyFileToFolders Include="Data\train-labels.idx1-ubyte">
       <Filter>Data</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Data\train-labels.idx1-ubyte">
+    <CopyFileToFolders Include="Data\t10k-labels.idx1-ubyte">
+      <Filter>Data</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Data\t10k-images.idx3-ubyte">
+      <Filter>Data</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Data\train-images.idx3-ubyte">
       <Filter>Data</Filter>
     </CopyFileToFolders>
   </ItemGroup>
@@ -59,16 +65,8 @@
     <ClInclude Include="Include\QuantizedImage.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="Include\Params.h">
+    <ClInclude Include="Include\Constants.h">
       <Filter>Include</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Data\t10k-images.idx3-ubyte">
-      <Filter>Data</Filter>
-    </None>
-    <None Include="Data\t10k-labels.idx1-ubyte">
-      <Filter>Data</Filter>
-    </None>
   </ItemGroup>
 </Project>

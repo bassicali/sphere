@@ -6,6 +6,7 @@
 #include "ISerializable.h"
 #include "Word.h"
 
+
 namespace sphere
 {
 	class HardLocation : ISerializable
@@ -19,7 +20,9 @@ namespace sphere
 		void Write(const Word& Data);
 		void Read(std::vector<COUNTER>& OutCounters);
 
-		const bool IsEmpty() const { return writes == 0; }
+		int WriteCount() const { return writeCount; }
+		const std::vector<uint8_t>& WriteHistory() const { return dataWritten; }
+
 		Word& Address() { return addr; }
 
 		virtual void Serialize(std::ostream& stream) override;
@@ -28,8 +31,10 @@ namespace sphere
 		static uint32_t NumInstances;
 
 		uint32_t id;
-		uint32_t writes;
+		uint32_t writeCount;
 		Word addr;
 		std::vector<COUNTER> counters;
+
+		std::vector<uint8_t> dataWritten;
 	};
 }

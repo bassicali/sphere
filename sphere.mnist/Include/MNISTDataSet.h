@@ -22,7 +22,8 @@ namespace sphere
 		MNISTDataSet(const char* ImagesDataPath, const char* LabelsDataPath);
 		MNISTDataSet(const char* ImagesDataPath);
 
-		Word CreateAverageImage();
+		Word CreateAverageImage(int8_t label);
+		Word CreateWeightedAverageImage(int8_t label, float* WeightAdjustments);
 
 		bool IsLabelled;
 		std::vector<QuantizedImage> Images;
