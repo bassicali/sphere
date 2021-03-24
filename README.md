@@ -20,7 +20,7 @@ Next I decided to try moving all the hard locations closer to the data set. To d
 
 _Average of dataset_
 
-<img src="images/average.bmp"/>
+<img src="images/average.bmp" width="168" height="168"/>
 
 _Hard location addresses  imprinted with average (each pixel represents a 4-bit integer)_
 
@@ -30,7 +30,7 @@ Part of the problem was that writes would be concentrated around a portion (20%)
 
 _Average per label_
 
-<img src="images/average-0.bmp"/> <img src="images/average-1.bmp"/> <img src="images/average-5.bmp"/>
+<img src="images/average-0.bmp" width="168" height="168" /> <img src="images/average-1.bmp" width="168" height="168"/> <img src="images/average-5.bmp" width="168" height="168"/>
 
 _Hard location addresses imprinted with average 0_
 
