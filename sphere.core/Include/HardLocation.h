@@ -12,9 +12,7 @@ namespace sphere
 	class HardLocation : ISerializable
 	{
 	public:
-		HardLocation(int WordSize, int RangeSize);
-		HardLocation(const Word& Addr);
-
+		HardLocation(int AddrWordDims, int DataWordDims, int RangeBitLen);
 		HardLocation(std::istream& stream);
 
 		void Write(const Word& Data);
@@ -32,6 +30,7 @@ namespace sphere
 
 		uint32_t id;
 		uint32_t writeCount;
+		uint16_t dataDims;
 		Word addr;
 		std::vector<COUNTER> counters;
 

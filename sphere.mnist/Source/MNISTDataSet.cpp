@@ -51,6 +51,11 @@ MNISTDataSet::MNISTDataSet(const char* ImagesDataPath, const char* LabelsDataPat
 	Load();
 }
 
+uint32_t ReverseBytes(uint32_t data)
+{
+	return ((data & 0xFF000000) >> 24) | ((data & 0x00FF0000) >> 8) | ((data & 0x0000FF00) << 8) | ((data & 0x000000FF) << 28);
+}
+
 void MNISTDataSet::Load()
 {
 #define LOAD_INT(s,x) s.read(reinterpret_cast<char*>(&x),sizeof(uint32_t));x=ReverseBytes(x);
@@ -133,37 +138,6 @@ void MNISTDataSet::Load()
 #undef LOAD_INT
 }
 
-Word MNISTDataSet::CreateAverageImage(int8_t label)
-{
-	int* average = new int[WORD_NUM_DIMENSIONS];
-	memset(average, 0, WORD_NUM_DIMENSIONS * sizeof(int));
-
-	uint8_t* buff = new uint8_t[WORD_NUM_DIMENSIONS];
-	int count = 0;
-	for (QuantizedImage& image : Images)
-	{
-		if (image.Label != label)
-			continue;
-
-		image.Unpack(buff, WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, 1);
-
-		for (int i = 0; i < WORD_NUM_DIMENSIONS; i++)
-			average[i] += buff[i];
-
-		count++;
-	}
-
-	memset(buff, 0, WORD_NUM_DIMENSIONS * sizeof(uint8_t));
-	for (int i = 0; i < WORD_NUM_DIMENSIONS; i++)
-	{
-		average[i] /= count;
-		buff[i] = (uint8_t)average[i] * 17;
-	}
-
-	QuantizedImage image(buff, WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, false);
-	return Word(WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, image.Data, image.Length);
-}
-
 Word MNISTDataSet::CreateWeightedAverageImage(int8_t target_label, float* WeightAdjustments)
 {
 	int counts[10];
@@ -220,9 +194,4 @@ Word MNISTDataSet::CreateWeightedAverageImage(int8_t target_label, float* Weight
 
 	QuantizedImage image(buff, WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, false);
 	return Word(WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, image.Data, image.Length);
-}
-
-uint32_t MNISTDataSet::ReverseBytes(uint32_t data)
-{
-	return ((data & 0xFF000000) >> 24) | ((data & 0x00FF0000) >> 8) | ((data & 0x0000FF00) << 8) | ((data & 0x000000FF) << 28);
 }

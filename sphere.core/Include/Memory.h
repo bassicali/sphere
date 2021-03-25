@@ -25,8 +25,8 @@ namespace sphere
 		Memory();
 		Memory(std::istream& stream);
 
-		void Initialize(int WordSize, int RangeLen, int NumHardLocations, int Radius);
-		void InitializeFixedHardLocations(int WordLen, int RangeLen, int NumHardLocations, int Radius, const std::vector<Word>& Addrs);
+		void Initialize(int AddrWordDims, int DataWordDims, int RangeBitLen, int NumHardLocations, int Radius);
+		void InitializeFixedHardLocations(int AddrWordDims, int DataWordDims, int RangeBitLen, int NumHardLocations, int Radius, const std::vector<Word>& Addrs);
 
 		bool Write(const Word& Addr, const Word& Data);
 		Word Read(const Word& Addr, bool& Conclusive);
@@ -45,7 +45,8 @@ namespace sphere
 			
 		std::vector<HardLocation> storage;
 		int radius;
-		int wordLen;
+		int addrDims;
+		int dataDims;
 		int rangeLen;
 		int writeCount;
 		bool initialized;

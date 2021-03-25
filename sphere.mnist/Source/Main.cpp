@@ -97,7 +97,7 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType)
 
 void TrainAndRecall()
 {
-	LOG_INFO("Training with MNIST data");
+	LOG_INFO("Training with data set: %s + %s", params.InputImages1.c_str(), params.InputLabels1.c_str());
 
 	trainer = new Trainer(params.InputImages1, params.InputLabels1, params.NumHardLocations);
 
@@ -111,7 +111,7 @@ void TrainAndRecall()
 	auto results1 = tester1.TestImages(trainer->Memory(), params.RecallCount);
 	results1.Print();
 
-	LOG_INFO("Recalling with unlearned data");
+	LOG_INFO("Recalling with unlearned data: %s + %s", params.InputImages2.c_str(), params.InputLabels2.c_str());
 	Tester tester2(params.InputImages2, params.InputLabels2);
 	auto results2 = tester2.TestImages(trainer->Memory(), params.RecallCount);
 
@@ -125,23 +125,24 @@ void TrainAndRecall()
 
 void TrainMemory()
 {
+	LOG_INFO("Training with data set 1: %s + %s", params.InputImages1.c_str(), params.InputLabels1.c_str());
+
 	trainer = new Trainer(params.InputImages1, params.InputLabels1, params.NumHardLocations);
 
 	float* in_weights = params.AdjustWeights ? weights : nullptr;
 	trainer->InitializeHardLocationsAddrs(params.ImprintWeight, in_weights, false);
 
-	LOG_INFO("Training with MNIST data");
 	trainer->TrainMemory(params.MemFile.c_str(), 0, params.TrainingCount, params.LogDistances, params.SaveVisuals);
 }
 
 void Recall()
 {
-	LOG_INFO("Testing trained memory");
+	LOG_INFO("Testing trained memory with data set: %s + %s", params.InputImages2.c_str(), params.InputLabels2.c_str());
 
 	LOG_INFO("Loading memory: %s", params.MemFile.c_str());
 	auto sdm = Memory::LoadFromFile(params.MemFile);
 
-	Tester tester(params.InputImages1, params.InputLabels1);
+	Tester tester(params.InputImages2, params.InputLabels2);
 	auto results = tester.TestImages(sdm, params.TrainingCount);
 	results.Print();
 }
@@ -216,13 +217,18 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	string filename("sphere-log.txt");
+	if (!fs::exists("logs"))
+	{
+		fs::create_directory("logs");
+	}
+
+	string filename("logs\\sphere-log.txt");
 
 	if (fs::exists(filename))
 	{
 		time_t result = time(nullptr);
 		char filename_buff[128];
-		sprintf_s(filename_buff, "sphere-log-%d.txt", result);
+		sprintf_s(filename_buff, "logs\\sphere-log-%d.txt", result);
 		fs::rename(filename, filename_buff);
 	}
 

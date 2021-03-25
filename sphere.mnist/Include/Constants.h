@@ -4,6 +4,7 @@
 #include "Word.h"
 
 #define WORD_NUM_DIMENSIONS		784
+#define DATA_NUM_DIMENSIONS		1
 #define RANGE_BIT_LEN			4
 #define QUANTIZATION_LEVELS		16
 

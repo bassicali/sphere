@@ -10,7 +10,7 @@
 #include "ISerializable.h"
 
 typedef uint32_t SUBWORD;
-#define SUBWORD_NUM_DIMENSIONS (8*sizeof(SUBWORD))
+#define SUBWORD_NUM_BITS (8*sizeof(SUBWORD))
 #define DECREMENT_UNMATCHED 0
 #define MANHATTAN_DISTANCE 0
 
@@ -42,11 +42,11 @@ namespace sphere
 
 		const float DistanceTo(const Word& Other) const;
 
-		const int Length() const { return wordLen; }
-		const int RangeLength() const { return rangeBitLen; }
+		const int NumDimensions() const { return numDims; }
+		const int RangeBits() const { return rangeBitLen; }
 		const int RangeSize() const { return rangeSize; }
-		const int SubWordLength() const { return sizeof(SUBWORD) * 8; }
-		const int NumSubWords() const { return numSubWords; }
+		const int SubwordBits() const { return sizeof(SUBWORD) * 8; }
+		const int NumSubwords() const { return numSubWords; }
 		const SUBWORD SubwordAt(int index) const { return subwords[index]; }
 		const uint8_t IntAt(int index) const;
 		void EnumerateInts(std::function<void(int, uint8_t)> func) const;
@@ -59,7 +59,7 @@ namespace sphere
 	private:
 		Word(int N, int RangeBits, std::vector<SUBWORD>& subwords);
 
-		uint16_t wordLen;
+		uint16_t numDims;
 		uint8_t rangeBitLen;
 		uint8_t rangeSize;
 

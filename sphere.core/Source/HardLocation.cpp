@@ -9,34 +9,26 @@ using namespace sphere;
 
 uint32_t HardLocation::NumInstances = 0;
 
-HardLocation::HardLocation(int WordLen, int RangeLen)
-	: addr(WordLen, RangeLen)
+HardLocation::HardLocation(int AddrWordDims, int DataWordDims, int RangeBitLen)
+	: addr(AddrWordDims, RangeBitLen)
 	, writeCount(0)
+	, dataDims(DataWordDims)
 	, id(NumInstances)
 {
-	int range_size = 1 << RangeLen;
-	counters = vector<COUNTER>(WordLen * range_size);
-	NumInstances++;
-}
-
-HardLocation::HardLocation(const Word& Address)
-	: addr(Address)
-	, counters(addr.Length() * addr.RangeSize(), 0)
-	, writeCount(0)
-	, id(NumInstances)
-{
+	int range_size = 1 << RangeBitLen;
+	counters = vector<COUNTER>(dataDims * range_size);
 	NumInstances++;
 }
 
 void HardLocation::Write(const Word& Data)
 {
-	if (counters.size() != (Data.Length() * addr.RangeSize()))
+	if (counters.size() != (Data.NumDimensions() * addr.RangeSize()))
 		throw exception("Invalid number of counters");
 
 	// TODO: optimize
 
-	int sub_len = Data.NumSubWords();
-	int range_len = Data.RangeLength();
+	int sub_len = Data.NumSubwords();
+	int range_len = Data.RangeBits();
 
 	if (range_len == 1)
 	{
@@ -46,9 +38,9 @@ void HardLocation::Write(const Word& Data)
 			SUBWORD w = Data.SubwordAt(i);
 			SUBWORD masked;
 
-			for (int j = 0; j < SUBWORD_NUM_DIMENSIONS; j++)
+			for (int j = 0; j < SUBWORD_NUM_BITS; j++)
 			{
-				ctr_index = i * SUBWORD_NUM_DIMENSIONS + j;
+				ctr_index = i * SUBWORD_NUM_BITS + j;
 				masked = w & (1 << j);
 
 				if (masked == 0)
@@ -66,7 +58,7 @@ void HardLocation::Write(const Word& Data)
 	}
 	else
 	{
-		int ints_per_sw = SUBWORD_NUM_DIMENSIONS / range_len;
+		int ints_per_sw = SUBWORD_NUM_BITS / range_len;
 		const uint8_t base_mask = (1 << range_len) - 1;
 		int range_size = Data.RangeSize();
 
@@ -74,7 +66,7 @@ void HardLocation::Write(const Word& Data)
 		{
 			SUBWORD sw = Data.SubwordAt(i);
 
-			for (int j = 0; j < ints_per_sw; j++)
+			for (int j = 0; j < ints_per_sw  && j < Data.NumDimensions(); j++)
 			{
 				int shift = 32 - (j + 1) * range_len;
 				SUBWORD mask = base_mask << shift;
@@ -117,7 +109,7 @@ void HardLocation::Read(vector<COUNTER>& OutCounters)
 	if (len != OutCounters.size())
 		throw exception("Incompatible counters lengths");
 
-	int range_len = addr.RangeLength();
+	int range_len = addr.RangeBits();
 
 	if (range_len == 1)
 	{
@@ -170,6 +162,7 @@ void HardLocation::Read(vector<COUNTER>& OutCounters)
 void HardLocation::Serialize(std::ostream& stream)
 {
 	STREAM_WRITE_INT32(stream, writeCount);
+	STREAM_WRITE_INT16(stream, dataDims);
 	addr.Serialize(stream);
 
 	for (COUNTER ctr : counters)
@@ -181,9 +174,10 @@ void HardLocation::Serialize(std::ostream& stream)
 HardLocation::HardLocation(std::istream& stream)
 {
 	STREAM_READ_INT32(stream, writeCount);
+	STREAM_READ_INT16(stream, dataDims);
 	
 	addr = Word(stream);
-	int ctr_len = addr.Length() * addr.RangeSize();
+	int ctr_len = dataDims * addr.RangeSize();
 
 	COUNTER ctr = 0;
 	for (int i = 0; i < ctr_len; i++)

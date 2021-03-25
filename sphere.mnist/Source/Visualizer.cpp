@@ -14,7 +14,7 @@
 
 void sphere::CreateBitmap(const Word& data, const char* filename, int width, int height, int resize_scale, int px_scale)
 {
-    assert(width * height == data.Length());
+    assert(width * height == data.NumDimensions());
 
     PIXEL* buff = new PIXEL[width * height * CHANNELS];
     data.EnumerateInts([&](int index, uint8_t integer) -> void

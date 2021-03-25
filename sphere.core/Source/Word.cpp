@@ -5,12 +5,13 @@
 #include <intrin.h>
 
 #include "Word.h"
+#include "Common.h"
 
 using namespace std;
 using namespace sphere;
 
 Word::Word()
-	: wordLen(0)
+	: numDims(0)
 	, rangeBitLen(0)
 	, rangeSize(0)
 	, numSubWords(0)
@@ -22,14 +23,14 @@ Word::Word()
  Construct a random word of a given bit length N
 */
 Word::Word(int N, int RangeBits) 
-	: wordLen(N)
+	: numDims(N)
 	, rangeBitLen(RangeBits)
 {
 	rangeSize = uint8_t(1 << rangeBitLen);
 	int total_len = N * RangeBits;
 
-	numSubWords = total_len / SUBWORD_NUM_DIMENSIONS;
-	lastSubwordLen = total_len % SUBWORD_NUM_DIMENSIONS;
+	numSubWords = total_len / SUBWORD_NUM_BITS;
+	lastSubwordLen = total_len % SUBWORD_NUM_BITS;
 
 	if (lastSubwordLen > 0)
 		numSubWords++;
@@ -44,19 +45,17 @@ Word::Word(int N, int RangeBits)
 * Construct from raw binary data
 */
 Word::Word(int N, int RangeBits, uint8_t* Ptr, int Len)
-	: wordLen(N)
+	: numDims(N)
 	, rangeBitLen(RangeBits)
 {
 	rangeSize = uint8_t(1 << rangeBitLen);
-	int total_len = N * RangeBits;
+	int total_len = numDims * rangeBitLen;
 
-	numSubWords = total_len / SUBWORD_NUM_DIMENSIONS;
-	lastSubwordLen = total_len % SUBWORD_NUM_DIMENSIONS;
+	numSubWords = MAX(1, total_len / SUBWORD_NUM_BITS);
+	lastSubwordLen = MAX(32, total_len) % SUBWORD_NUM_BITS;
 
 	if (lastSubwordLen > 0)
-	{
 		numSubWords++;
-	}
 
 	static_assert(sizeof(SUBWORD) / sizeof(uint8_t) == 4, "Cannot work with this subword size");
 
@@ -97,12 +96,12 @@ Word::Word(int N, int RangeBits, uint8_t* Ptr, int Len)
  Construct from an string
 */
 Word::Word(int N, int RangeBits, string StringData)
-	: wordLen(N)
+	: numDims(N)
 	, rangeBitLen(RangeBits)
 {
 	rangeSize = uint8_t(1 << rangeBitLen);
-	numSubWords = wordLen / SUBWORD_NUM_DIMENSIONS;
-	lastSubwordLen = wordLen % SUBWORD_NUM_DIMENSIONS;
+	numSubWords = numDims / SUBWORD_NUM_BITS;
+	lastSubwordLen = numDims % SUBWORD_NUM_BITS;
 
 	if (lastSubwordLen > 0)
 		numSubWords++;
@@ -144,13 +143,13 @@ Word::Word(int N, int RangeBits, string StringData)
  Private constructor for supplying the subwords array
 */
 Word::Word(int N, int RangeBits, vector<SUBWORD>& SubWords)
-	: wordLen(N)
+	: numDims(N)
 	, rangeBitLen(RangeBits)
 {
-	int total_len = N * RangeBits;
+	int total_len = numDims * rangeBitLen;
 
-	numSubWords = total_len / SUBWORD_NUM_DIMENSIONS;
-	lastSubwordLen = total_len % SUBWORD_NUM_DIMENSIONS;
+	numSubWords = MAX(1, total_len / SUBWORD_NUM_BITS);
+	lastSubwordLen = MAX(32, total_len) % SUBWORD_NUM_BITS;
 
 	if (lastSubwordLen > 0)
 		numSubWords++;
@@ -162,7 +161,7 @@ Word::Word(int N, int RangeBits, vector<SUBWORD>& SubWords)
 
 const float Word::DistanceTo(const Word& Other) const
 {
-	if (Other.Length() != Length())
+	if (Other.NumDimensions() != NumDimensions())
 	{
 		throw exception("Incompatible word lengths");
 	}
@@ -189,7 +188,7 @@ const float Word::DistanceTo(const Word& Other) const
 	}
 	else
 	{
-		int ints_per_sw = SUBWORD_NUM_DIMENSIONS / rangeBitLen;
+		int ints_per_sw = SUBWORD_NUM_BITS / rangeBitLen;
 		const uint8_t base_mask = (1 << rangeBitLen) - 1;
 		float running_sum = 0.0f;
 		int shift;
@@ -241,7 +240,7 @@ const float Word::DistanceTo(const Word& Other) const
 Word Word::FromCounters(const vector<COUNTER>& counters, int RangeLen, bool& Conclusive)
 {
 	Conclusive = false;
-	int word_len = counters.size() / (1 << RangeLen);
+	int word_num_dims = counters.size() / (1 << RangeLen);
 
 	if (RangeLen == 1)
 	{
@@ -250,9 +249,9 @@ Word Word::FromCounters(const vector<COUNTER>& counters, int RangeLen, bool& Con
 		int bit_index = 0;
 		SUBWORD w = 0;
 
-		for (int i = 0; i < word_len; i++)
+		for (int i = 0; i < word_num_dims; i++)
 		{
-			bit_index = i % SUBWORD_NUM_DIMENSIONS;
+			bit_index = i % SUBWORD_NUM_BITS;
 
 			if (i > 0 && bit_index == 0)
 			{
@@ -277,7 +276,7 @@ Word Word::FromCounters(const vector<COUNTER>& counters, int RangeLen, bool& Con
 			}
 		}
 
-		return Word(word_len, RangeLen, subwords);
+		return Word(word_num_dims, RangeLen, subwords);
 	}
 	else
 	{
@@ -307,22 +306,22 @@ Word Word::FromCounters(const vector<COUNTER>& counters, int RangeLen, bool& Con
 			return Word();
 		}
 
-		assert(values.size() == word_len);
+		assert(values.size() == word_num_dims);
 		
 		// Pack the individual values into subwords
 
 		vector<SUBWORD> subwords;
-		int ints_per_sw = SUBWORD_NUM_DIMENSIONS / RangeLen;
+		int ints_per_sw = SUBWORD_NUM_BITS / RangeLen;
 		int values_len = values.size();
 
-		for (int val_index = 0; val_index < values.size();)
+		for (int val_idx = 0; val_idx < values.size();)
 		{
 			SUBWORD sw = 0;
 
-			for (int j = 0; j < ints_per_sw; j++)
+			for (int j = 0; j < ints_per_sw && j < word_num_dims; j++)
 			{
-				int shift = SUBWORD_NUM_DIMENSIONS - ((j + 1) * RangeLen);
-				sw = sw | (values[val_index] << shift);
+				int shift = SUBWORD_NUM_BITS - ((j + 1) * RangeLen);
+				sw = sw | (values[val_idx] << shift);
 
 				if (shift == 0)
 				{
@@ -330,18 +329,24 @@ Word Word::FromCounters(const vector<COUNTER>& counters, int RangeLen, bool& Con
 					sw = 0;
 				}
 
-				val_index++;
+				val_idx++;
+			}
+
+			if (subwords.size() == 0)
+			{
+				subwords.push_back(sw);
+				assert(val_idx >= values.size());
 			}
 		}
 
-		return Word(word_len, RangeLen, subwords);
+		return Word(word_num_dims, RangeLen, subwords);
 	}
 
 }
 
 void Word::Serialize(ostream& stream)
 {
-	STREAM_WRITE_INT16(stream, wordLen);
+	STREAM_WRITE_INT16(stream, numDims);
 	STREAM_WRITE_INT8(stream, rangeBitLen);
 	STREAM_WRITE_INT16(stream, numSubWords);
 	STREAM_WRITE_INT16(stream, lastSubwordLen);
@@ -359,7 +364,7 @@ Word::Word(istream& stream)
 {
 	assert(subwords.size() == 0);
 
-	STREAM_READ_INT16(stream, wordLen);
+	STREAM_READ_INT16(stream, numDims);
 	STREAM_READ_INT8(stream, rangeBitLen);
 	rangeSize = 1 << rangeBitLen;
 	STREAM_READ_INT16(stream, numSubWords);
@@ -410,10 +415,10 @@ void Word::PadVector(vector<SUBWORD>& subwords, int len)
 const uint8_t Word::IntAt(int index) const
 {
 	int bIndex = index * rangeBitLen;
-	int swIndex = bIndex / SUBWORD_NUM_DIMENSIONS;
+	int swIndex = bIndex / SUBWORD_NUM_BITS;
 
-	int indexInSw = bIndex % SUBWORD_NUM_DIMENSIONS;
-	int distFromRight = SUBWORD_NUM_DIMENSIONS - indexInSw - rangeBitLen + 1;
+	int indexInSw = bIndex % SUBWORD_NUM_BITS;
+	int distFromRight = SUBWORD_NUM_BITS - indexInSw - rangeBitLen + 1;
 	SUBWORD mask = ((1 << rangeBitLen) - 1) << distFromRight;
 
 	uint8_t result = uint8_t((subwords[swIndex] & mask) >> distFromRight);
@@ -423,7 +428,7 @@ const uint8_t Word::IntAt(int index) const
 
 void Word::EnumerateInts(std::function<void(int, uint8_t)> func) const
 {
-	int ints_per_sw = SubWordLength() / rangeBitLen;
+	int ints_per_sw = SubwordBits() / rangeBitLen;
 	assert(ints_per_sw % 2 == 0); // Add odd lenghts later
 	int shift;
 	uint8_t mask = (1 << rangeBitLen) - 1;
@@ -432,9 +437,9 @@ void Word::EnumerateInts(std::function<void(int, uint8_t)> func) const
 
 	for (const SUBWORD& sw : subwords)
 	{
-		for (int i = 0; i < ints_per_sw; i++)
+		for (int i = 0; i < ints_per_sw && i < numDims; i++)
 		{
-			shift = SubWordLength() - (rangeBitLen * (i + 1));
+			shift = SubwordBits() - (rangeBitLen * (i + 1));
 			integer = (sw >> shift) & mask;
 			func(integer_index, integer);
 			integer_index++;
@@ -444,9 +449,9 @@ void Word::EnumerateInts(std::function<void(int, uint8_t)> func) const
 
 void Word::Imprint(const Word& other, float scale, int iterations)
 {
-	assert(other.wordLen == wordLen && other.rangeBitLen == rangeBitLen);
+	assert(other.numDims == numDims && other.rangeBitLen == rangeBitLen);
 
-	int ints_per_sw = SubWordLength() / rangeBitLen;
+	int ints_per_sw = SubwordBits() / rangeBitLen;
 	assert(ints_per_sw % 2 == 0);
 	int shift;
 	uint8_t mask = (1 << rangeBitLen) - 1;
@@ -460,7 +465,7 @@ void Word::Imprint(const Word& other, float scale, int iterations)
 
 		for (int j = 0; j < ints_per_sw; j++)
 		{
-			shift = SubWordLength() - (rangeBitLen * (j + 1));
+			shift = SubwordBits() - (rangeBitLen * (j + 1));
 			uint8_t int0 = (sw0 >> shift) & mask;
 			uint8_t int1 = (sw1 >> shift) & mask;
 

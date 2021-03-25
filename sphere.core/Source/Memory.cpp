@@ -9,7 +9,8 @@ using namespace std;
 using namespace sphere;
 
 Memory::Memory()
-	: wordLen(0)
+	: addrDims(0)
+	, dataDims(0)
 	, rangeLen(0)
 	, radius(0)
 	, writeCount(0)
@@ -18,31 +19,25 @@ Memory::Memory()
 {
 }
 
-void Memory::Initialize(int WordLen, int RangeLen, int NumHardLocations, int Radius)
+void Memory::Initialize(int AddrWordDims, int DataWordDims, int RangeBitLen, int NumHardLocations, int Radius)
 {
 	if (initialized) 
 		throw exception("Memory cannot be initialized more than once");
 
-	wordLen = WordLen;
-	rangeLen = RangeLen;
+	addrDims = AddrWordDims;
+	dataDims = DataWordDims;
+	rangeLen = RangeBitLen;
 	radius = Radius;
 
 	for (int i = 0; i < NumHardLocations; i++)
 	{
-		storage.push_back(HardLocation(wordLen, rangeLen));
+		storage.push_back(HardLocation(addrDims, dataDims, rangeLen));
 	}
 
-	//auto& ref = storage[0];
-	//for (int i = 0; i < 100; i++)
-	//{
-	//	float dist = ref.Address().DistanceTo(storage[i].Address());
-	//	LOG_INFO("Dist from addr_0 to addr_%d: %.2f", i, dist);
-	//}
-	//
 	initialized = true;
 }
 
-void Memory::InitializeFixedHardLocations(int WordLen, int RangeLen, int NumHardLocations, int Radius, const vector<Word>& Addrs)
+void Memory::InitializeFixedHardLocations(int AddrWordDims, int DataWordDims, int RangeBitLen, int NumHardLocations, int Radius, const vector<Word>& Addrs)
 {
 	if (initialized)
 		throw exception("Memory cannot be initialized more than once");
@@ -50,15 +45,15 @@ void Memory::InitializeFixedHardLocations(int WordLen, int RangeLen, int NumHard
 	if (Addrs.size() < NumHardLocations)
 		throw exception("Not enough hard locations provided");
 
-	wordLen = WordLen;
-	rangeLen = RangeLen;
+	addrDims = AddrWordDims;
+	dataDims = DataWordDims;
+	rangeLen = RangeBitLen;
 	radius = Radius;
 	for (int i = 0; i < NumHardLocations; i++)
 	{
 		const Word& addr = Addrs[i];
-		storage.push_back(HardLocation(addr));
+		storage.push_back(HardLocation(addrDims, dataDims, rangeLen));
 	}
-	storage = vector<HardLocation>(NumHardLocations, HardLocation(wordLen, rangeLen));
 
 	initialized = true;
 }
@@ -112,7 +107,7 @@ Word Memory::Read(const Word& Addr, bool& Conclusive)
 
 	// TODO: impl iterative reading based on the SD of activated locations
 
-	vector<COUNTER> counters(Addr.Length() * Addr.RangeSize(), 0);
+	vector<COUNTER> counters(dataDims * (1 << rangeLen), 0);
 
 	// Find each HL that's within the activation radius and accumulate its values to the counters array
 	for (int i = 0; i < len; i++)
@@ -171,18 +166,19 @@ Memory Memory::LoadFromFile(const string& FilePath)
 void Memory::Serialize(ostream& stream)
 {
 	stream.write(FILE_PREFIX, FILE_PREFIX_LEN);
-	STREAM_WRITE_INT32(stream, wordLen);
+	STREAM_WRITE_INT32(stream, addrDims);
+	STREAM_WRITE_INT32(stream, dataDims);
 	STREAM_WRITE_INT32(stream, rangeLen);
 	STREAM_WRITE_INT32(stream, radius);
 	STREAM_WRITE_INT32(stream, writeCount);
 
-	int loc_count = storage.size();
-	STREAM_WRITE_INT32(stream, loc_count);
+	int hl_count = storage.size();
+	STREAM_WRITE_INT32(stream, hl_count);
 
 	int hl_idx = 0;
-	for (HardLocation& loc : storage)
+	for (HardLocation& hl : storage)
 	{
-		loc.Serialize(stream);
+		hl.Serialize(stream);
 
 		if (++hl_idx % (storage.size() / 10) == 0)
 		{
@@ -203,21 +199,22 @@ Memory::Memory(istream& stream)
 		throw exception("Invalid file; prefix not found.");
 	}
 
-	STREAM_READ_INT32(stream, wordLen)
+	STREAM_READ_INT32(stream, addrDims)
+	STREAM_READ_INT32(stream, dataDims)
 	STREAM_READ_INT32(stream, rangeLen)
 	STREAM_READ_INT32(stream, radius)
 	STREAM_READ_INT32(stream, writeCount)
 
-	int loc_count;
-	STREAM_READ_INT32(stream, loc_count)
+	int hl_count;
+	STREAM_READ_INT32(stream, hl_count)
 
-	for (int idx = 0; idx < loc_count; idx++)
+	for (int idx = 0; idx < hl_count; idx++)
 	{
 		storage.push_back(HardLocation(stream));
 
-		if (idx % (loc_count / 10) == 0)
+		if (idx % (hl_count / 10) == 0)
 		{
-			float progress = (float(idx) / loc_count) * 100;
+			float progress = (float(idx) / hl_count) * 100;
 			LOG_INFO("Load progress: %.0f%%", progress);
 		}
 	}

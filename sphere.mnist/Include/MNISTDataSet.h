@@ -22,7 +22,6 @@ namespace sphere
 		MNISTDataSet(const char* ImagesDataPath, const char* LabelsDataPath);
 		MNISTDataSet(const char* ImagesDataPath);
 
-		Word CreateAverageImage(int8_t label);
 		Word CreateWeightedAverageImage(int8_t label, float* WeightAdjustments);
 
 		bool IsLabelled;
@@ -33,6 +32,5 @@ namespace sphere
 		std::string LabelsFile;
 
 		void Load();
-		uint32_t ReverseBytes(uint32_t data);
 	};
 }

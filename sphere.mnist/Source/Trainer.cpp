@@ -31,7 +31,7 @@ Trainer::Trainer(const std::string& ImagesFile, const std::string& LabelsFile, i
 void Trainer::InitializeHardLocationsAddrs(float imprint_weight, float* label_weights, bool segment_imprints)
 {
 	LOG_INFO("Creating %d random hard locations", numHardLocations);
-	sdm.Initialize(WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, numHardLocations, RADIUS);
+	sdm.Initialize(WORD_NUM_DIMENSIONS, DATA_NUM_DIMENSIONS, RANGE_BIT_LEN, numHardLocations, RADIUS);
 
 
 	LOG_INFO("Imprinting hard locations with data-set average");
@@ -101,8 +101,7 @@ void Trainer::TrainMemory(const char* filename, int start_from, int limit, int l
 	if (save_bitmaps > 0)
 		CreateVisualizations(save_bitmaps);
 
-	const int data_len = (WORD_NUM_DIMENSIONS * RANGE_BIT_LEN) / 8;
-	assert(WORD_NUM_DIMENSIONS * RANGE_BIT_LEN % 8 == 0);
+	const int data_len = MAX(DATA_NUM_DIMENSIONS*RANGE_BIT_LEN, 8) / 8;
 	uint8_t* buff = new uint8_t[data_len];
 
 	int training_limit = limit > 0 && limit < data.Images.size() ? limit : data.Images.size();
@@ -132,7 +131,7 @@ void Trainer::TrainMemory(const char* filename, int start_from, int limit, int l
 		// Compose a data word for storing the label; a repeating 8 bit (the label) sequence
 		uint8_t pattern = (image.Label << 4) | image.Label;
 		memset(buff, pattern, data_len);
-		Word image_data(WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, buff, data_len);
+		Word image_data(DATA_NUM_DIMENSIONS, RANGE_BIT_LEN, buff, data_len);
 		Word address(WORD_NUM_DIMENSIONS, RANGE_BIT_LEN, image.Data, image.Length);
 		sdm.Write(address, image_data);
 
@@ -215,7 +214,7 @@ void Trainer::CreateVisualizations(int count)
 	char filename[256];
 	memset(filename, 0, sizeof(char) * 256);
 
-	if (averages[0].Length())
+	if (averages[0].NumDimensions())
 	{
 		// Save a visualization for each kind of HL if imprints were segmented
 		int hls_per_label = sdm.HardLocations().size() / 10;
@@ -248,10 +247,10 @@ void Trainer::CreateVisualizations(int count)
 		CreateBitmap(image, filename, 28, 28, 6);
 	}
 
-	if (average.Length())
+	if (average.NumDimensions())
 		CreateBitmap(average, "visuals\\average.bmp", 28, 28, 10);
 
-	if (averages[0].Length())
+	if (averages[0].NumDimensions())
 	{
 		char filename[128];
 		for (int label = 0; label < 10; label++)
