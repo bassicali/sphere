@@ -9,7 +9,7 @@ An implementation of Integer Sparse Distributed Memory used to memorize and reca
 - Counters are 16-bits long
 
 ## Read/Write Procedure
-The reading and writing algorithm is almost identical to the one described by Javier Snaider. I used the Euclidean distance rather than the Manhattan distance when determining which locations to activate. The main difference is that hard locations don't have the same address and data; the data that's written to each location is a 4 bit number representing the label (0-9). I.e. when writing storing the label '5', the counter at index 5 is incremented; there are 16 counters in each location. The fact that address and data are different (with data being only one dimension long) means the iterative reading technique can't be done with this design.
+The reading and writing algorithm is almost identical to the one described by Javier Snaider. I used the Euclidean distance rather than the Manhattan distance when determining which locations to activate. The main difference is that hard locations don't have the same address and data; the data that's written to each location is a 4 bit number representing the label (0-9). I.e. when storing the label '5', the counter at index 5 is incremented; there are 16 counters in each location. The fact that address and data are different (with data being only one dimension long) means the iterative reading technique can't be done with this design.
 
 ## Hard Location Distribution
 This is probably the most challenging aspect of the design. According to Kanerva the two requirements for their distribution to maintain the properties of SDM is that they be uniformly spaced and for each read/write to only activate a small percentage of them.
@@ -51,3 +51,4 @@ The low accuracy is a direct result of the distribution the hard locations and i
 - Snaider, J., Franklin, S. Integer Sparse Distributed Memory 
 - Snaider, J. 2012. Integer Sparse Distributed Memory and Modular Composite Representation
 - [MNIST data set](http://yann.lecun.com/exdb/mnist/)
+- [STB library](https://github.com/nothings/stb)
